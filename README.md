@@ -11,15 +11,21 @@ Ajustes → Emisión → Servicio: Personalizado
 - Clave de retransmisión: tu Stream key
 Recomendado: keyframe cada 2 s, codificador x264, H.264 + AAC.
 
-## 3. Probar en local
+## 3. Chat de Twitch
+El chat es el de un canal de Twitch (https://dev.twitch.tv/docs/embed/chat/).
+Necesitas una cuenta/canal de Twitch y poner su nombre en `NEXT_PUBLIC_TWITCH_CHANNEL`.
+Los espectadores deben iniciar sesión en Twitch dentro del recuadro para escribir.
+El parámetro `parent` se calcula solo con el dominio actual (localhost, Vercel, previews).
+
+## 4. Probar en local
 ```
 cp .env.example .env.local   # rellena los valores
 npm install
 npm run dev
 ```
 
-## 4. Desplegar en Vercel
+## 5. Desplegar en Vercel
 1. Sube la carpeta a GitHub.
 2. En vercel.com → Add New → Project → importa el repo.
-3. En Environment Variables agrega: LIVEPEER_API_KEY, LIVEPEER_STREAM_ID, NEXT_PUBLIC_CHANNEL_NAME.
+3. En Environment Variables agrega: LIVEPEER_API_KEY, LIVEPEER_STREAM_ID, NEXT_PUBLIC_CHANNEL_NAME, NEXT_PUBLIC_TWITCH_CHANNEL.
 4. Deploy.

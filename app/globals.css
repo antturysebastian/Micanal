@@ -15,3 +15,7 @@ h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 0; font-weight: 700; letter-sp
 .empty { height: 100%; display: grid; place-content: center; text-align: center; gap: 6px; padding: 24px; background: var(--panel); }
 .empty strong { font-size: 1.25rem; }
 .empty span { color: var(--muted); max-width: 42ch; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.chat { height: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.chat iframe { width: 100%; height: 100%; border: 0; display: block; }
+@media (max-width: 860px) { .layout { grid-template-columns: 1fr; } .chat { height: 480px; } }

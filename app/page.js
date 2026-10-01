@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Player from "../components/Player";
+import Chat from "../components/Chat";
 
 export default function Home() {
   const [state, setState] = useState({ status: "loading" });
@@ -35,6 +36,7 @@ export default function Home() {
         </span>
       </header>
 
+      <div className="layout">
       <div className="stage">
         {live ? (
           <Player src={state.url} />
@@ -51,6 +53,10 @@ export default function Home() {
             </span>
           </div>
         )}
+      </div>
+      <aside className="chat">
+        <Chat />
+      </aside>
       </div>
     </main>
   );
