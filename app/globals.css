@@ -1,9 +1,9 @@
 :root { --bg:#10131a; --panel:#181c26; --line:#2a3040; --text:#e8eaf0; --muted:#8b93a7; --live:#ff5d73; --accent:#7aa2ff; }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
-main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+main { max-width: 1760px; margin: 0 auto; padding: 20px clamp(16px, 2.5vw, 40px) 40px; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 0; font-weight: 700; letter-spacing: -0.02em; }
+h1 { font-size: clamp(1.4rem, 2.2vw, 2.25rem); margin: 0; font-weight: 700; letter-spacing: -0.02em; }
 .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
 .badge.on { color: var(--text); border-color: var(--live); }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
@@ -15,7 +15,8 @@ h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 0; font-weight: 700; letter-sp
 .empty { height: 100%; display: grid; place-content: center; text-align: center; gap: 6px; padding: 24px; background: var(--panel); }
 .empty strong { font-size: 1.25rem; }
 .empty span { color: var(--muted); max-width: 42ch; }
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
-.chat { height: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.chat iframe { width: 100%; height: 100%; border: 0; display: block; }
-@media (max-width: 860px) { .layout { grid-template-columns: 1fr; } .chat { height: 480px; } }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 26vw, 480px); gap: 20px; align-items: stretch; }
+.chat { position: relative; min-height: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.chat iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+.chat .empty { position: absolute; inset: 0; }
+@media (max-width: 960px) { .layout { grid-template-columns: 1fr; } .chat { height: 520px; min-height: 0; } }
