@@ -14,7 +14,7 @@ const Icon = ({ n }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{I[n]}</svg>
 );
 
-export default function Player({ src }) {
+export default function Player({ src, webrtc }) {
   const wrapRef = useRef(null);
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -27,13 +27,24 @@ export default function Player({ src }) {
   const [menu, setMenu] = useState(false);
   const [atLive, setAtLive] = useState(true);
   const [active, setActive] = useState(true);
+  // Intenta WebRTC (baja latencia) y cae a HLS si falla. Con ?hls en la URL se fuerza HLS para comparar.
+  const [mode, setMode] = useState(() =>
+    webrtc && typeof window !== "undefined" && "RTCPeerConnection" in window && !new URLSearchParams(window.location.search).has("hls")
+      ? "webrtc"
+      : "hls"
+  );
 
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || !src) return;
+    if (mode !== "hls" || !v || !src) return;
     let hls;
     if (Hls.isSupported()) {
-      hls = new Hls({ lowLatencyMode: true });
+      hls = new Hls({
+        lowLatencyMode: true,
+        liveSyncDurationCount: 2, // por defecto 3: se mantiene menos segmentos detrás del directo
+        liveMaxLatencyDurationCount: 5, // si se atrasa más de esto, salta hacia el directo
+        maxLiveSyncPlaybackRate: 1.1, // acelera hasta 10% para recuperar terreno sin saltos
+      });
       hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(v);
@@ -50,7 +61,52 @@ export default function Player({ src }) {
       v.src = src; // Safari reproduce HLS de forma nativa
     }
     return () => { hls?.destroy(); hlsRef.current = null; };
-  }, [src]);
+  }, [src, mode]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (mode !== "webrtc" || !v || !webrtc) return;
+    setLevels([]);
+    setLevel(-1);
+    setAtLive(true);
+    let closed = false;
+    let pc;
+    let timer;
+    const fail = (why) => {
+      if (closed) return;
+      console.warn("WebRTC no disponible, usando HLS:", why);
+      setMode("hls");
+    };
+    (async () => {
+      try {
+        let endpoint = webrtc;
+        try { const h = await fetch(webrtc, { method: "HEAD" }); if (h.url) endpoint = h.url; } catch {} // sigue la redirección al nodo más cercano
+        pc = new RTCPeerConnection({ iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"] }] });
+        pc.addTransceiver("video", { direction: "recvonly" });
+        pc.addTransceiver("audio", { direction: "recvonly" });
+        pc.ontrack = (e) => {
+          if (e.streams[0] && v.srcObject !== e.streams[0]) { v.srcObject = e.streams[0]; v.play().catch(() => {}); }
+        };
+        pc.onconnectionstatechange = () => {
+          if (["failed", "disconnected", "closed"].includes(pc.connectionState)) fail(pc.connectionState);
+        };
+        await pc.setLocalDescription(await pc.createOffer());
+        await new Promise((res) => {
+          if (pc.iceGatheringState === "complete") return res();
+          const done = () => { if (pc.iceGatheringState === "complete") { pc.removeEventListener("icegatheringstatechange", done); res(); } };
+          pc.addEventListener("icegatheringstatechange", done);
+          setTimeout(res, 2000);
+        });
+        const r = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/sdp" }, body: pc.localDescription.sdp });
+        if (!r.ok) throw new Error("WHEP " + r.status);
+        await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
+        timer = setTimeout(() => { if (v.readyState < 2) fail("sin video tras 8 s"); }, 8000);
+      } catch (e) {
+        fail(e.message);
+      }
+    })();
+    return () => { closed = true; clearTimeout(timer); pc?.close(); v.srcObject = null; };
+  }, [mode, webrtc]);
 
   const v = () => videoRef.current;
   const toggle = () => (v().paused ? v().play() : v().pause());
@@ -100,6 +156,7 @@ export default function Player({ src }) {
         <button className={`live ${atLive ? "on" : ""}`} onClick={goLive} title="Ir al directo">
           <i /> {atLive ? "EN DIRECTO" : "VOLVER AL DIRECTO"}
         </button>
+        <span className={`mode ${mode === "webrtc" ? "rtc" : ""}`} title="Protocolo de reproducción">{mode === "webrtc" ? "WebRTC · baja latencia" : "HLS"}</span>
         <span className="grow" />
         {levels.length > 0 && (
           <div className="qwrap">

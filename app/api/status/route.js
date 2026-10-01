@@ -14,13 +14,16 @@ export async function GET() {
     if (!stream.isActive) return Response.json({ live: false }, { headers });
 
     let url = `https://livepeer.studio/hls/${stream.playbackId}/index.m3u8`;
+    let webrtc = `https://livepeercdn.studio/webrtc/${stream.playbackId}`;
     try {
       const p = await fetch(`${API}/playback/${stream.playbackId}`, { headers: auth, cache: "no-store" }).then((r) => r.json());
       const hls = p?.meta?.source?.find((s) => s.hrn?.startsWith("HLS"));
       if (hls?.url) url = hls.url;
+      const rtc = p?.meta?.source?.find((s) => s.hrn?.startsWith("WebRTC"));
+      if (rtc?.url) webrtc = rtc.url;
     } catch {}
 
-    return Response.json({ live: true, url }, { headers });
+    return Response.json({ live: true, url, webrtc }, { headers });
   } catch {
     return Response.json({ error: "api" }, { status: 502 });
   }

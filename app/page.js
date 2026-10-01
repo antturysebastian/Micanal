@@ -14,7 +14,7 @@ export default function Home() {
         const d = await r.json();
         if (stop) return;
         if (!r.ok) setState({ status: "error", code: d.error });
-        else setState((prev) => (d.live ? (prev.url === d.url ? prev : { status: "live", url: d.url }) : { status: "offline" }));
+        else setState((prev) => (d.live ? (prev.url === d.url ? prev : { status: "live", url: d.url, webrtc: d.webrtc }) : { status: "offline" }));
       } catch {
         if (!stop) setState({ status: "error", code: "network" });
       }
@@ -39,7 +39,7 @@ export default function Home() {
       <div className="layout">
       <div className="stage">
         {live ? (
-          <Player src={state.url} />
+          <Player src={state.url} webrtc={state.webrtc} />
         ) : (
           <div className="empty">
             <strong>

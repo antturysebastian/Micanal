@@ -5,11 +5,29 @@
 2. Developers → API Keys → crea una API key.
 3. Streams → Create stream. Anota el **Stream ID**, la **Stream key** y la URL de ingesta RTMP.
 
-## 2. Configurar OBS
-Ajustes → Emisión → Servicio: Personalizado
+## 2. Configurar OBS (con ajustes de baja latencia)
+Ajustes -> Emisión -> Servicio: Personalizado
 - Servidor: `rtmp://rtmp.livepeer.com/live`
 - Clave de retransmisión: tu Stream key
-Recomendado: keyframe cada 2 s, codificador x264, H.264 + AAC.
+
+Ajustes -> Salida -> Modo de salida: Avanzado -> pestaña Emisión:
+- Control de tasa: CBR (por ejemplo 3000-4500 Kbps para 720p/1080p)
+- Intervalo de fotogramas clave: 1 s (o 2 s si ves cortes)
+- Codificador x264: Preajuste de CPU `veryfast` (o más rápido), Ajuste (tune) `zerolatency`
+- Opciones de x264: `bframes=0`
+- Si usas NVENC: Máx. fotogramas B = 0, Look-ahead desactivado
+Sin B-frames tampoco habrá problemas si luego activas reproducción WebRTC.
+
+## Latencia y WebRTC
+El reproductor intenta primero reproducir por WebRTC (WHEP, ~0,5-3 s) y, si falla o no hay
+video en 8 s, cae automáticamente a HLS. La etiqueta junto al botón "EN DIRECTO" muestra cuál se usa.
+Para comparar, abre la página con `?hls` al final de la URL (por ejemplo `https://tu-sitio.vercel.app/?hls`)
+y se fuerza HLS. Requisitos: OBS sin B-frames (`bframes=0`). WebRTC no tiene selector de calidad.
+
+### HLS
+Con HLS la latencia suele estar entre 5 y 10 s. El reproductor ya usa `liveSyncDurationCount: 2`
+y `maxLiveSyncPlaybackRate: 1.1` (components/Player.js). Si ves cortes o buffering, sube
+`liveSyncDurationCount` a 3 (valor por defecto de hls.js).
 
 ## 3. Chat de Twitch
 El chat es el de un canal de Twitch (https://dev.twitch.tv/docs/embed/chat/).
