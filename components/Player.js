@@ -9,7 +9,6 @@ const I = {
   mute: <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><line x1="22" y1="9" x2="16" y2="15" /><line x1="16" y1="9" x2="22" y2="15" /></>,
   full: <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />,
   gear: <><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1" /></>,
-  eye: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>,
 };
 const Icon = ({ n }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{I[n]}</svg>
@@ -27,7 +26,6 @@ export default function Player({ src }) {
   const [level, setLevel] = useState(-1);
   const [menu, setMenu] = useState(false);
   const [atLive, setAtLive] = useState(true);
-  const [viewers, setViewers] = useState(null);
   const [active, setActive] = useState(true);
 
   useEffect(() => {
@@ -54,23 +52,6 @@ export default function Player({ src }) {
     return () => { hls?.destroy(); hlsRef.current = null; };
   }, [src]);
 
-  useEffect(() => {
-    let stop = false;
-    let id;
-    try { id = crypto.randomUUID(); } catch { return; }
-    async function beat() {
-      if (document.hidden) return;
-      try {
-        const r = await fetch("/api/viewers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
-        const d = await r.json();
-        if (!stop && typeof d.count === "number") setViewers(d.count);
-      } catch {}
-    }
-    beat();
-    const t = setInterval(beat, 15000);
-    return () => { stop = true; clearInterval(t); };
-  }, []);
-
   const v = () => videoRef.current;
   const toggle = () => (v().paused ? v().play() : v().pause());
   const unmute = () => { v().muted = false; if (!v().volume) v().volume = 1; };
@@ -96,19 +77,11 @@ export default function Player({ src }) {
         autoPlay
         muted
         playsInline
-        onClick={toggle}
-        onDoubleClick={fullscreen}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onVolumeChange={() => { setMuted(v().muted); setVol(v().volume); }}
         onTimeUpdate={onTime}
       />
-
-      {viewers !== null && (
-        <div className="pill" title="Espectadores ahora">
-          <Icon n="eye" /> <b>{viewers.toLocaleString("es")}</b> <span>viendo</span>
-        </div>
-      )}
 
       {muted && playing && (
         <button className="unmute" onClick={unmute}><Icon n="mute" /> Activar sonido</button>
