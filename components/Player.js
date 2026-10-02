@@ -14,7 +14,7 @@ const Icon = ({ n }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{I[n]}</svg>
 );
 
-export default function Player({ src, webrtc }) {
+export default function Player({ src }) {
   const wrapRef = useRef(null);
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -27,30 +27,33 @@ export default function Player({ src, webrtc }) {
   const [menu, setMenu] = useState(false);
   const [atLive, setAtLive] = useState(true);
   const [active, setActive] = useState(true);
-  // Intenta WebRTC (baja latencia) y cae a HLS si falla. Con ?hls en la URL se fuerza HLS para comparar.
-  const [mode, setMode] = useState(() =>
-    webrtc && typeof window !== "undefined" && "RTCPeerConnection" in window && !new URLSearchParams(window.location.search).has("hls")
-      ? "webrtc"
-      : "hls"
-  );
 
   useEffect(() => {
     const v = videoRef.current;
-    if (mode !== "hls" || !v || !src) return;
+    if (!v || !src) return;
     let hls;
     if (Hls.isSupported()) {
       hls = new Hls({
         lowLatencyMode: true,
-        liveSyncDurationCount: 2, // por defecto 3: se mantiene menos segmentos detrás del directo
-        liveMaxLatencyDurationCount: 5, // si se atrasa más de esto, salta hacia el directo
-        maxLiveSyncPlaybackRate: 1.1, // acelera hasta 10% para recuperar terreno sin saltos
+        liveSyncDurationCount: 1, // se queda a ~1 segmento del borde del directo (mínimo posible; por defecto 3)
+        liveMaxLatencyDurationCount: 3, // si se atrasa más de 3 segmentos, salta al directo
+        maxLiveSyncPlaybackRate: 1.15, // acelera hasta 15% para recuperar terreno sin saltos
+        maxBufferLength: 4, // no acumula más de ~4 s de video por delante
+        backBufferLength: 10, // libera memoria del video ya visto
+        startFragPrefetch: true, // empieza a pedir el siguiente segmento antes
       });
       hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(v);
-      hls.on(Hls.Events.MANIFEST_PARSED, (_, d) =>
-        setLevels(d.levels.map((l, i) => ({ i, h: l.height })).filter((l) => l.h).sort((a, b) => b.h - a.h))
-      );
+      hls.on(Hls.Events.MANIFEST_PARSED, (_, d) => {
+        const best = new Map(); // altura -> índice del nivel con mayor bitrate
+        d.levels.forEach((l, i) => {
+          if (!l.height) return;
+          const cur = best.get(l.height);
+          if (cur === undefined || l.bitrate > d.levels[cur].bitrate) best.set(l.height, i);
+        });
+        setLevels([...best].map(([h, i]) => ({ i, h })).sort((a, b) => b.h - a.h));
+      });
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (!data.fatal) return;
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
@@ -61,52 +64,7 @@ export default function Player({ src, webrtc }) {
       v.src = src; // Safari reproduce HLS de forma nativa
     }
     return () => { hls?.destroy(); hlsRef.current = null; };
-  }, [src, mode]);
-
-  useEffect(() => {
-    const v = videoRef.current;
-    if (mode !== "webrtc" || !v || !webrtc) return;
-    setLevels([]);
-    setLevel(-1);
-    setAtLive(true);
-    let closed = false;
-    let pc;
-    let timer;
-    const fail = (why) => {
-      if (closed) return;
-      console.warn("WebRTC no disponible, usando HLS:", why);
-      setMode("hls");
-    };
-    (async () => {
-      try {
-        let endpoint = webrtc;
-        try { const h = await fetch(webrtc, { method: "HEAD" }); if (h.url) endpoint = h.url; } catch {} // sigue la redirección al nodo más cercano
-        pc = new RTCPeerConnection({ iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"] }] });
-        pc.addTransceiver("video", { direction: "recvonly" });
-        pc.addTransceiver("audio", { direction: "recvonly" });
-        pc.ontrack = (e) => {
-          if (e.streams[0] && v.srcObject !== e.streams[0]) { v.srcObject = e.streams[0]; v.play().catch(() => {}); }
-        };
-        pc.onconnectionstatechange = () => {
-          if (["failed", "disconnected", "closed"].includes(pc.connectionState)) fail(pc.connectionState);
-        };
-        await pc.setLocalDescription(await pc.createOffer());
-        await new Promise((res) => {
-          if (pc.iceGatheringState === "complete") return res();
-          const done = () => { if (pc.iceGatheringState === "complete") { pc.removeEventListener("icegatheringstatechange", done); res(); } };
-          pc.addEventListener("icegatheringstatechange", done);
-          setTimeout(res, 2000);
-        });
-        const r = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/sdp" }, body: pc.localDescription.sdp });
-        if (!r.ok) throw new Error("WHEP " + r.status);
-        await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
-        timer = setTimeout(() => { if (v.readyState < 2) fail("sin video tras 8 s"); }, 8000);
-      } catch (e) {
-        fail(e.message);
-      }
-    })();
-    return () => { closed = true; clearTimeout(timer); pc?.close(); v.srcObject = null; };
-  }, [mode, webrtc]);
+  }, [src]);
 
   const v = () => videoRef.current;
   const toggle = () => (v().paused ? v().play() : v().pause());
@@ -121,7 +79,7 @@ export default function Player({ src, webrtc }) {
   };
   const onTime = () => {
     const h = hlsRef.current;
-    if (h?.liveSyncPosition) setAtLive(h.liveSyncPosition - v().currentTime < 12);
+    if (h?.liveSyncPosition) setAtLive(h.liveSyncPosition - v().currentTime < 6);
   };
 
   const show = active || !playing || menu;
@@ -156,7 +114,6 @@ export default function Player({ src, webrtc }) {
         <button className={`live ${atLive ? "on" : ""}`} onClick={goLive} title="Ir al directo">
           <i /> {atLive ? "EN DIRECTO" : "VOLVER AL DIRECTO"}
         </button>
-        <span className={`mode ${mode === "webrtc" ? "rtc" : ""}`} title="Protocolo de reproducción">{mode === "webrtc" ? "WebRTC · baja latencia" : "HLS"}</span>
         <span className="grow" />
         {levels.length > 0 && (
           <div className="qwrap">

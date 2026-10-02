@@ -42,6 +42,4 @@ h1 { font-size: clamp(1.4rem, 2.2vw, 2.25rem); margin: 0; font-weight: 700; lett
 .menu button:hover { background: rgba(255,255,255,.08); }
 .menu button.sel { color: var(--accent); font-weight: 600; }
 @media (max-width: 600px) { .vol { display: none; } .live { margin-left: 0; } }
-.mode { margin-left: 8px; padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; font-size: .72rem; color: var(--muted); white-space: nowrap; }
-.mode.rtc { color: var(--accent); border-color: var(--accent); }
-@media (max-width: 600px) { .mode { display: none; } }
+@media (max-width: 600px) { @media (max-width: 600px) { .controls { padding: 8px 10px; } .cbtn { width: 32px; height: 32px; } .live { display: none; } } }
